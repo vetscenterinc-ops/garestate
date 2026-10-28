@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Focused Study">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;-webkit-text-size-adjust:100%}</style>
+<title>Focused Study</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one frosted flash card at a time, filters on top, thumb controls docked at the bottom */
+:root{
+  --bg:#06070b; --surface:rgba(255,255,255,.055); --ink:#eef1f7; --muted:#9aa3b5; --line:rgba(255,255,255,.09);
+  --navy:#9cc0ff; --brick:#ff9a8f; --ok:#6ef0b0; --okbg:rgba(110,240,176,.12); --bad:#ff8a80; --badbg:rgba(255,138,128,.12);
+  --chip:rgba(255,255,255,.06); --warn:#ffd27a; --warnbg:rgba(255,210,122,.11);
+  --edge:rgba(255,255,255,.13); --shadow:0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08);
+  --orb1:#2f5bff; --orb2:#9b3dff; --orb3:#00b39b; --glow:rgba(110,160,255,.45);
+  --display:"Zilla Slab",Georgia,serif; --body:"Instrument Sans",system-ui,-apple-system,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.orbs{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.orbs i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(70px);opacity:.38;will-change:transform}
+.orbs i:nth-child(1){background:var(--orb1);left:-25vmax;top:-25vmax;animation:drift1 22s ease-in-out infinite alternate}
+.orbs i:nth-child(2){background:var(--orb2);right:-30vmax;top:20vh;opacity:.28;animation:drift2 26s ease-in-out infinite alternate}
+.orbs i:nth-child(3){background:var(--orb3);left:0;bottom:-35vmax;opacity:.22;animation:drift3 30s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(18vmax,14vmax) scale(1.1)}}
+@keyframes drift2{to{transform:translate(-16vmax,-10vmax) scale(.9)}}
+@keyframes drift3{to{transform:translate(20vmax,-12vmax) scale(1.15)}}
+.glass{background:var(--surface);border:1px solid var(--edge);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%)}
+.wrap{max-width:640px;margin:0 auto;padding-block:24px 140px;display:flex;flex-direction:column;gap:14px}
+header h1{font-family:var(--display);font-size:clamp(34px,9vw,46px);line-height:1.05;margin:0 0 4px;background:linear-gradient(100deg,#fff 20%,var(--navy) 40%,#fff 60%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite}
+@keyframes shine{from{background-position:100% 0}to{background-position:-150% 0}}
+header{animation:rise .6s ease-out both}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brick);font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.face:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px;border-radius:14px}
+.filters button{border:0;background:none;padding:7px 12px;border-radius:9px;font-size:14px;color:var(--muted);font-weight:500}
+.filters button[aria-pressed="true"]{background:var(--chip);color:var(--ink);box-shadow:inset 0 0 0 1px var(--edge)}
+.filters .sp{flex:1}
+.prog{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.prog .track{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.prog .fill{height:100%;background:linear-gradient(90deg,var(--orb1),var(--navy),var(--ok));width:0;transition:width .45s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 12px var(--glow)}
+.prog .row{display:flex;justify-content:space-between;gap:8px}
+/* card */
+.fc{display:flex;flex-direction:column;gap:12px}
+.face{border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:12px;min-height:340px}
+.face .top{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:12.5px;color:var(--brick)}
+.face .side{letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--body);font-weight:600;font-size:11px}
+.qt{color:#fff;font-family:var(--display);font-weight:500;font-size:clamp(19px,4.6vw,22px);line-height:1.3;margin:0;text-wrap:pretty}
+ol.opts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ol.opts li{padding:8px 10px;border-radius:10px;background:var(--chip);font-size:14.5px}
+ol.opts li b{font-family:var(--mono);font-weight:500;margin-right:8px;color:var(--brick)}
+.hint{margin-top:auto;font-size:12.5px;color:var(--muted);text-align:center}
+.back .ansrow{display:flex;gap:14px;align-items:center}
+.back .letter{font-family:var(--display);font-weight:700;font-size:44px;line-height:1;color:var(--ok);width:58px;height:58px;border-radius:16px;background:var(--okbg);display:grid;place-items:center;flex:none}
+.back .atext{font-weight:600;font-size:16px}
+.back p{margin:0}
+.flag{font-size:13px;background:var(--warnbg);color:var(--warn);padding:8px 10px;border-radius:10px}
+.flag b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.viz{background:var(--chip);border:1px solid var(--line);border-radius:14px;padding:12px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.viz .big{font-family:var(--display);font-size:32px;line-height:1;color:var(--navy)}
+.viz .cap{color:var(--muted)}
+.flow{display:flex;flex-direction:column}
+.flow div{background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+.flow i{display:block;text-align:center;color:var(--brick);font-style:normal;line-height:1.3}
+.flow div:last-child{border-color:var(--ok);color:var(--ok);font-weight:600}
+.chk{display:flex;gap:8px;align-items:baseline}
+.chk span{font-family:var(--mono);font-weight:500;width:14px;flex:none}
+.chk.y span{color:var(--ok)} .chk.n span{color:var(--bad)} .chk.n{color:var(--muted)}
+.tl{display:flex;flex-direction:column;gap:6px}
+.tl .bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line)}
+.tl .bar i{display:block;height:100%}
+.tl .row{display:flex;gap:8px;font-family:var(--mono);font-size:12px}
+.eq{font-family:var(--mono);font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.eq span{background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.eq em{font-style:normal;color:var(--brick)} .eq span.r{border-color:var(--ok);color:var(--ok)}
+.verdict{font-family:var(--display);font-size:21px;font-weight:700}
+.verdict.y{color:var(--ok)} .verdict.n{color:var(--bad)}
+.map{display:grid;grid-template-columns:auto auto 1fr;gap:4px 6px;align-items:center}
+.map b{font-weight:500} .map i{color:var(--brick);font-style:normal}
+.mark{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}
+.mark button{border:1px solid var(--edge);background:var(--chip);border-radius:12px;padding:11px;font-weight:600}
+.mark .again[aria-pressed="true"]{background:var(--warnbg);color:var(--warn)}
+.mark .got[aria-pressed="true"]{background:var(--okbg);color:var(--ok)}
+/* dock */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));border-width:1px 0 0;border-radius:0}
+.dock .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+.dock button{border:1px solid var(--edge);background:var(--chip);border-radius:14px;padding:13px 8px;font-weight:600;font-size:15px}
+.dock .flip{background:linear-gradient(135deg,#8fb6ff,#b48bff);color:#0a0c14;border-color:transparent;box-shadow:0 0 22px var(--glow);animation:pulse 2.8s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 34px rgba(160,140,255,.6)}}
+.dock button:active,.mark button:active,.filters button:active{transform:scale(.95)}
+.dock button,.mark button,.filters button{transition:transform .12s,background .2s,color .2s}
+.dock button:disabled{opacity:.4;cursor:default}
+.empty{text-align:center;color:var(--muted);padding:40px 16px;border-radius:22px}
+/* JS deck mode: one card, one side at a time */
+.js .fc[hidden]{display:none!important}
+.js .fc .back{display:none} .js .fc.flipped .back{display:flex} .js .fc.flipped .front{display:none}
+.js .fc{perspective:1400px}
+.js .face{cursor:pointer;transform-origin:50% 50%}
+.js .fc.turn-out .face{animation:tout .2s ease-in forwards}
+.js .fc.turn-in .face{animation:tin .32s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes tout{to{transform:rotateY(90deg) scale(.96)}}
+@keyframes tin{from{transform:rotateY(-90deg) scale(.96)}to{transform:none}}
+.js .fc.in-r{animation:inr .38s cubic-bezier(.2,.9,.3,1)}
+.js .fc.in-l{animation:inl .38s cubic-bezier(.2,.9,.3,1)}
+@keyframes inr{from{opacity:0;transform:translateX(60px) rotate(4deg)}}
+@keyframes inl{from{opacity:0;transform:translateX(-60px) rotate(-4deg)}}
+.js .fc.dragging{transition:none}
+.js .fc.snap{transition:transform .3s cubic-bezier(.2,.9,.3,1.2)}
+.js .fc.flipped .back>*{animation:rise .45s cubic-bezier(.2,.9,.3,1) both}
+.js .fc.flipped .back>*:nth-child(2){animation-delay:.08s}.js .fc.flipped .back>*:nth-child(3){animation-delay:.16s}
+.js .fc.flipped .back>*:nth-child(4){animation-delay:.24s}.js .fc.flipped .back>*:nth-child(5){animation-delay:.32s}.js .fc.flipped .back>*:nth-child(6){animation-delay:.4s}
+.js .fc.flipped .letter{animation:pop .5s cubic-bezier(.2,1.6,.4,1) .12s both}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.js .fc:not(.flipped) .opts li{animation:rise .4s ease-out both}
+.js .fc:not(.flipped) .opts li:nth-child(2){animation-delay:.05s}.js .fc:not(.flipped) .opts li:nth-child(3){animation-delay:.1s}.js .fc:not(.flipped) .opts li:nth-child(4){animation-delay:.15s}.js .fc:not(.flipped) .opts li:nth-child(n+5){animation-delay:.2s}
+.letter{box-shadow:0 0 26px rgba(110,240,176,.35)}
+.fc.burst-got .face{box-shadow:0 0 0 2px var(--ok),0 0 40px rgba(110,240,176,.45)}
+.fc.burst-again .face{box-shadow:0 0 0 2px var(--warn),0 0 40px rgba(255,210,122,.4)}
+.face{transition:box-shadow .3s}
+/* no-JS fallback (e.g. iPhone Files preview): every card shown with its back underneath */
+html:not(.js) .dock,html:not(.js) .filters,html:not(.js) .prog,html:not(.js) .hint,html:not(.js) .mark{display:none}
+html:not(.js) .wrap{padding-bottom:40px;gap:28px}
+html:not(.js) .face{min-height:0}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (max-width:420px){.face{padding:18px;border-radius:20px}}
+</style>
+
+<div class="orbs" aria-hidden="true"><i></i><i></i><i></i></div>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Focused Study</h1>
+    <div class="eyebrow">License Law &amp; Rules · 58 flash cards</div>
+  </header>
+  <div class="filters glass" role="group" aria-label="Which cards">
+    <button id="f-all" aria-pressed="true">All</button>
+    <button id="f-again" aria-pressed="false">Study again</button>
+    <button id="f-flag" aria-pressed="false">Flagged</button>
+    <span class="sp"></span>
+    <button id="shuffle" aria-pressed="false">Shuffle</button>
+  </div>
+  <div class="prog"><div class="row"><span id="pos">Card 1 of 58</span><span id="tally">0 got it · 0 again</span></div><div class="track"><div class="fill" id="fill"></div></div></div>
+  <main id="deck"><article class="fc" data-i="0">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q01</span><span class="side">Question</span></div>
+<p class="qt">You're working with a buyer (customer) on your seller client's house. The buyer gives you $2,000 earnest money; the offer expires in 48 hours. Next morning the buyer wants the money back. Can your broker release it?</p>
+<ol class="opts"><li><b>a.</b>Yes, if the seller agrees</li><li><b>b.</b>Yes, if the offer has not been accepted</li><li><b>c.</b>No, not until the offer has expired</li><li><b>d.</b>No, you have a binding contract</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q01</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Yes, if the offer has not been accepted</div></div>
+<p>An offer can be withdrawn any time before it is accepted and the buyer is told of the acceptance. No contract exists yet, so the earnest money is still the buyer's and must be returned. The 48-hour deadline only limits how long the offer lives; it doesn't lock the buyer in.</p>
+<div class="viz"><div class="flow"><div>Offer submitted</div><i>↓</i><div>Buyer withdraws before acceptance</div><i>↓</i><div>Earnest money refunded</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="1">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q02</span><span class="side">Question</span></div>
+<p class="qt">Before a salesperson can become a broker or associate broker, they must have been actively licensed for how long?</p>
+<ol class="opts"><li><b>a.</b>Three out of five years</li><li><b>b.</b>Two out of five years</li><li><b>c.</b>Five years</li><li><b>d.</b>Three years</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q02</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Three years</div></div>
+<p>Three years of active licensure. Remember the number 3.</p><div class="flag"><b>Check with instructor</b>Georgia's statute says at least three years of active licensure within the five years before applying, which is choice A's wording. If both appear on the state exam, the 3-of-5 wording is the more precise match.</div>
+<div class="viz"><div class="big">3 yrs</div><div class="cap">active license before broker</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="2">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q03</span><span class="side">Question</span></div>
+<p class="qt">If an affiliated licensee violates the rules or license law, must the broker notify the Commission?</p>
+<ol class="opts"><li><b>a.</b>Yes, only if money was involved</li><li><b>b.</b>No, the broker can provide training</li><li><b>c.</b>No, only consumers can file complaints</li><li><b>d.</b>Yes, always</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q03</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Yes, always</div></div>
+<p>The broker supervises every affiliate and must report a known violation to GREC. Training the agent doesn't replace reporting, and it doesn't matter whether money was involved. This is one of the rare times "always" is right.</p>
+<div class="viz"><div class="verdict y">✓ Always report</div><div class="cap">Broker → GREC</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="3">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q04</span><span class="side">Question</span></div>
+<p class="qt">When advertising a property for sale, what information must be included?</p>
+<ol class="opts"><li><b>a.</b>Broker's name, street address and phone number</li><li><b>b.</b>Name of the listing agent</li><li><b>c.</b>Price of the property</li><li><b>d.</b>Broker's name as registered with GREC</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q04</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Broker's name as registered with GREC</div></div>
+<p>Every ad must show the firm's name exactly as registered with the Georgia Real Estate Commission. The agent's name, the price and the office address are optional. An ad without the registered firm name is a blind ad.</p>
+<div class="viz"><div class="chk y"><span>✓</span>Firm name as registered with GREC</div><div class="chk n"><span>✕</span>Agent's name (optional)</div><div class="chk n"><span>✕</span>Price (optional)</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="4">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q05</span><span class="side">Question</span></div>
+<p class="qt">When can a broker NOT deposit earnest money in an insured trust account?</p>
+<ol class="opts"><li><b>a.</b>Never</li><li><b>b.</b>Only with the permission of the buyer</li><li><b>c.</b>Only with the permission of the seller</li><li><b>d.</b>Only with permission from all parties</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q05</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Only with permission from all parties</div></div>
+<p>Earnest money goes into the broker's trust account by default. Handling it any other way requires written agreement from all parties to the transaction. Neither the buyer nor the seller can change that alone.</p>
+<div class="viz"><div class="chk n"><span>✕</span>Buyer alone</div><div class="chk n"><span>✕</span>Seller alone</div><div class="chk y"><span>✓</span>All parties agree in writing</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="5">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q06</span><span class="side">Question</span></div>
+<p class="qt">To get a salesperson license, an applicant must do all of the following EXCEPT:</p>
+<ol class="opts"><li><b>a.</b>Be 18 years of age</li><li><b>b.</b>Take a 75-hour classroom real estate course</li><li><b>c.</b>Have a high school diploma or equivalent</li><li><b>d.</b>Pass the class and the state exam</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q06</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Take a 75-hour classroom real estate course</div></div>
+<p>The 75-hour prelicense course is required, but it doesn't have to be taken in a classroom; approved online courses count. The word "classroom" is what makes B the exception.</p>
+<div class="viz"><div class="chk y"><span>✓</span>Age 18+</div><div class="chk y"><span>✓</span>High school diploma / GED</div><div class="chk y"><span>✓</span>75 hours, any approved format</div><div class="chk n"><span>✕</span>Must be in a classroom</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="6">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q07</span><span class="side">Question</span></div>
+<p class="qt">When must earnest money be turned over to the broker?</p>
+<ol class="opts"><li><b>a.</b>As soon as practically possible</li><li><b>b.</b>Immediately, unless the agent has written permission to hold it</li><li><b>c.</b>When an offer is accepted</li><li><b>d.</b>Within 72 hours</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q07</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">As soon as practically possible</div></div>
+<p>Georgia doesn't set a fixed number of hours. The agent hands funds to the broker as soon as practically possible, and the broker then deposits them in the trust account.</p>
+<div class="viz"><div class="flow"><div>Agent receives EM</div><i>↓</i><div>As soon as practical</div><i>↓</i><div>Broker's trust account</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="7">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q08</span><span class="side">Question</span></div>
+<p class="qt">Your client asks that earnest money be held in a separate interest-bearing trust account. Is this legal?</p>
+<ol class="opts"><li><b>a.</b>No, it must be in the broker's trust account</li><li><b>b.</b>Yes, with permission and notification to the Commission</li><li><b>c.</b>Yes, if all parties agree and the Commission is notified of the account</li><li><b>d.</b>Yes, since the seller is the client and is entitled to the earnest money</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q08</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Yes, if all parties agree and the Commission is notified of the account</div></div>
+<p>A separate or interest-bearing account is allowed when every party agrees (including who gets the interest) and the broker registers that account with GREC. Permission from one party is not enough.</p>
+<div class="viz"><div class="chk y"><span>✓</span>All parties agree in writing</div><div class="chk y"><span>✓</span>GREC notified of the account</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="8">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q09</span><span class="side">Question</span></div>
+<p class="qt">Georgia law requires a broker's license for which of the following?</p>
+<ol class="opts"><li><b>a.</b>Referring a potential client to another broker without a fee</li><li><b>b.</b>Listing a property for sale for a fee</li><li><b>c.</b>Advertising property for another for a fee</li><li><b>d.</b>Managing a subdivision association for a community you live in</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q09</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Listing a property for sale for a fee</div></div>
+<p>A license is needed when you perform real estate acts for someone else and expect a fee. Listing property for a fee is the core brokerage act. Unpaid referrals and volunteer work for your own community don't need a license.</p><div class="flag"><b>Check with instructor</b>Advertising property for others for a fee (C) is also a licensed activity under Georgia law. B is the classic textbook example.</div>
+<div class="viz"><div class="eq"><span class="">For others</span><em>+</em><span class="">For a fee</span><em>=</em><span class="r">License required</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="9">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q10</span><span class="side">Question</span></div>
+<p class="qt">An agent may want to stop practicing for a while but return later. What is their best option?</p>
+<ol class="opts"><li><b>a.</b>Keep the license active with a broker</li><li><b>b.</b>Surrender the license</li><li><b>c.</b>Place the license on inactive status</li><li><b>d.</b>Let the license lapse</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q10</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Place the license on inactive status</div></div>
+<p>Inactive status keeps the license alive without being affiliated with a broker. You can reactivate later by meeting the requirements. Lapsing means reinstatement fees, and surrendering means starting over.</p>
+<div class="viz"><div class="chk y"><span>✓</span>Inactive: easy return</div><div class="chk n"><span>✕</span>Lapse: fees and deadlines</div><div class="chk n"><span>✕</span>Surrender: start over</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="10">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q11</span><span class="side">Question</span></div>
+<p class="qt">A corporation's qualifying broker must be an officer. What must the qualifying broker of an LLC be?</p>
+<ol class="opts"><li><b>a.</b>An officer</li><li><b>b.</b>A shareholder</li><li><b>c.</b>A member</li><li><b>d.</b>An investor</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q11</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">A member</div></div>
+<p>The qualifying broker must hold a controlling role in the firm. Owners of an LLC are called members, so the qualifying broker must be a member.</p>
+<div class="viz"><div class="map"><b>Corporation</b><i>→</i><span>Officer</span><b>Partnership</b><i>→</i><span>Partner</span><b>LLC</b><i>→</i><span>Member</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="11">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q12</span><span class="side">Question</span></div>
+<p class="qt">If the Commission finds a broker's trust account unsafe, what will it do?</p>
+<ol class="opts"><li><b>a.</b>Close the account</li><li><b>b.</b>Report it to the Attorney General</li><li><b>c.</b>Appoint a receiver</li><li><b>d.</b>Close the brokerage</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q12</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Report it to the Attorney General</div></div>
+<p>GREC doesn't seize the account itself. It refers the matter to the Attorney General, who can ask a court to appoint a receiver to protect the money.</p>
+<div class="viz"><div class="flow"><div>GREC finds account unsafe</div><i>↓</i><div>Attorney General</div><i>↓</i><div>Court appoints receiver</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="12">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q13</span><span class="side">Question</span></div>
+<p class="qt">In Georgia, an associate broker can do which of the following?</p>
+<ol class="opts"><li><b>a.</b>List property in their own name if registered</li><li><b>b.</b>Advertise property in their own name</li><li><b>c.</b>Review contracts if authorized by the qualifying broker</li><li><b>d.</b>Hire a salesperson of his/her choosing</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q13</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Review contracts if authorized by the qualifying broker</div></div>
+<p>An associate broker still works under the qualifying broker. Listings and ads belong to the firm, and hiring is the qualifying broker's call. Reviewing contracts is a supervisory task the qualifying broker can delegate.</p>
+<div class="viz"><div class="flow"><div>Qualifying broker</div><i>↓</i><div>Delegates duty</div><i>↓</i><div>Associate broker reviews contracts</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="13">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q14</span><span class="side">Question</span></div>
+<p class="qt">Can a licensee work under a brokerage other than the one holding their license?</p>
+<ol class="opts"><li><b>a.</b>No, this violates license law</li><li><b>b.</b>Yes, with permission from both brokers</li><li><b>c.</b>Yes, with permission of their qualifying broker</li><li><b>d.</b>Yes, with permission from GREC</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q14</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Yes, with permission of their qualifying broker</div></div>
+<p>Your license is held by one firm, and that firm's qualifying broker is responsible for you. Acting through another brokerage requires your own qualifying broker's consent.</p>
+<div class="viz"><div class="verdict y">✓ Your broker's OK</div><div class="cap">Your broker stays responsible</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="14">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q15</span><span class="side">Question</span></div>
+<p class="qt">If an agent lets their license lapse, how can they reinstate it?</p>
+<ol class="opts"><li><b>a.</b>Go through the application process again</li><li><b>b.</b>Within 2 years, by paying renewal fees, reinstatement fee and late charges</li><li><b>c.</b>Within 10 years, by paying all fees</li><li><b>d.</b>Once lapsed, you can never get it back</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q15</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Within 2 years, by paying renewal fees, reinstatement fee and late charges</div></div>
+<p>A lapsed license can be reinstated within two years by paying the renewal fees, the reinstatement fee and late charges (plus any missing education). After two years, you have to requalify.</p>
+<div class="viz"><div class="tl"><div class="bar"><i style="width:50%;background:var(--ok)"></i><i style="width:50%;background:var(--bad)"></i></div><div class="row"><span style="color:var(--ok)">■</span><span>0–2 yrs: pay &amp; reinstate</span></div><div class="row"><span style="color:var(--bad)">■</span><span>2+ yrs: requalify</span></div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="15">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q16</span><span class="side">Question</span></div>
+<p class="qt">A new licensee must complete __ hours of training, which equals __ hours of continuing education.</p>
+<ol class="opts"><li><b>a.</b>20 and 9</li><li><b>b.</b>25 and 9</li><li><b>c.</b>36 and 9</li><li><b>d.</b>25 and 6</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q16</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">25 and 9</div></div>
+<p>New licensees take a 25-hour post-license course during their first renewal period. Those 25 hours count as 9 hours toward continuing education.</p>
+<div class="viz"><div class="eq"><span class="">25 hr post-license</span><em>=</em><span class="r">9 hr CE credit</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="16">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q17</span><span class="side">Question</span></div>
+<p class="qt">To renew, a licensee (unless grandfathered) must complete ___ hours of CE every ___ years.</p>
+<ol class="opts"><li><b>a.</b>24 and 4</li><li><b>b.</b>24 and 2</li><li><b>c.</b>36 and 3</li><li><b>d.</b>36 and 4</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q17</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">36 and 4</div></div>
+<p>Georgia requires 36 hours of continuing education for each 4-year renewal period. Three of those hours must be license law.</p>
+<div class="viz"><div class="big">36 / 4</div><div class="cap">CE hours per 4-year cycle</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="17">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q18</span><span class="side">Question</span></div>
+<p class="qt">A listing where the broker's commission is the difference between the selling price and the seller's requested net is what kind of listing?</p>
+<ol class="opts"><li><b>a.</b>Open listing</li><li><b>b.</b>Exclusive listing</li><li><b>c.</b>Net listing</li><li><b>d.</b>Blind listing</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q18</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Net listing</div></div>
+<p>In a net listing, the seller names the amount they want, and the broker keeps everything above it. It creates a conflict of interest, which is why net listings are discouraged and treated as improper in Georgia.</p>
+<div class="viz"><div class="eq"><span class="">$300k sale</span><em>−</em><span class="">$280k net</span><em>=</em><span class="r">$20k to broker</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="18">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q19</span><span class="side">Question</span></div>
+<p class="qt">The Georgia Real Estate Commission has the authority to:</p>
+<ol class="opts"><li><b>a.</b>Revoke an already issued license</li><li><b>b.</b>Refuse to issue a license</li><li><b>c.</b>Set fees for licensees</li><li><b>d.</b>All the above</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q19</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">All the above</div></div>
+<p>GREC administers license law. It can refuse, suspend or revoke licenses and sets the fees licensees pay.</p>
+<div class="viz"><div class="chk y"><span>✓</span>Revoke licenses</div><div class="chk y"><span>✓</span>Refuse licenses</div><div class="chk y"><span>✓</span>Set fees</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="19">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q20</span><span class="side">Question</span></div>
+<p class="qt">Your buyer offers $490,000 and asks for the stove and smart fridge. The seller agrees to the price and stove, crosses out the fridge and initials it. What do you have?</p>
+<ol class="opts"><li><b>a.</b>Binding agreement</li><li><b>b.</b>Terminated offer</li><li><b>c.</b>Accepted offer</li><li><b>d.</b>Counteroffer</li><li><b>e.</b>Both B and D</li><li><b>f.</b>Both A and C</li><li><b>g.</b>Voided contract</li><li><b>h.</b>None of the above</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q20</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">e</div><div class="atext">Both B and D</div></div>
+<p>Any change to an offer, even a small one, is a rejection plus a new offer. Striking the fridge made the seller's response a counteroffer, and that terminated the buyer's original offer. So both B and D are true.</p>
+<div class="viz"><div class="flow"><div>Offer: price + stove + fridge</div><i>↓</i><div>Seller strikes fridge</div><i>↓</i><div>Counteroffer; original offer dead</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="20">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q21</span><span class="side">Question</span></div>
+<p class="qt">Broker Smith had associate broker Brown manage the trust account. GREC suspended Brown's license. What should Smith do?</p>
+<ol class="opts"><li><b>a.</b>Nothing</li><li><b>b.</b>Suspend Brown</li><li><b>c.</b>Terminate Brown</li><li><b>d.</b>Remove Brown from the trust account but let him buy &amp; sell</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q21</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Terminate Brown</div></div>
+<p>A suspended licensee can't do any licensed work, so the broker must end the affiliation and return the license to GREC. Option D fails because Brown can't list or sell for the firm while suspended either.</p>
+<div class="viz"><div class="verdict n">✕ No licensed work</div><div class="cap">while suspended</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="21">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q22</span><span class="side">Question</span></div>
+<p class="qt">The Research, Education and Recovery Fund must hold at least $1,000,000. If it drops below that, what does GREC do?</p>
+<ol class="opts"><li><b>a.</b>Charge all agents a fee immediately</li><li><b>b.</b>Charge a fee at license renewal until restored</li><li><b>c.</b>Charge a fee on every transaction</li><li><b>d.</b>Add a fee on property tax</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q22</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Charge a fee at license renewal until restored</div></div>
+<p>GREC tops up the fund by adding a fee when licenses are renewed. It continues until the balance is back to the $1,000,000 minimum.</p>
+<div class="viz"><div class="big">$1M</div><div class="cap">minimum; refilled at renewal</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="22">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q23</span><span class="side">Question</span></div>
+<p class="qt">Your listing sold. How long can advertising stay up after a contract is terminated or closed?</p>
+<ol class="opts"><li><b>a.</b>Internet ad and sign removed within 10 days</li><li><b>b.</b>Both removed within 30 days</li><li><b>c.</b>Sign within 10 days; no limit online</li><li><b>d.</b>Sign within 10 days; internet within 30 days</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q23</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Sign within 10 days; internet within 30 days</div></div>
+<p>The yard sign must come down within 10 days, and internet advertising must come down within 30 days. Keep the two numbers separate.</p>
+<div class="viz"><div class="tl"><div class="bar"><i style="width:33.33333333333333%;background:var(--ok)"></i><i style="width:66.66666666666666%;background:var(--warn)"></i></div><div class="row"><span style="color:var(--ok)">■</span><span>Day 10: sign</span></div><div class="row"><span style="color:var(--warn)">■</span><span>Day 30: online ads</span></div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="23">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q24</span><span class="side">Question</span></div>
+<p class="qt">A salesperson receives earnest money on Friday evening. When should it be turned over?</p>
+<ol class="opts"><li><b>a.</b>Friday evening</li><li><b>b.</b>Saturday morning</li><li><b>c.</b>Monday morning</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q24</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Monday morning</div></div>
+<p>"As soon as practically possible" means the next banking day, when the broker can actually deposit it. From Friday evening, that's Monday morning.</p>
+<div class="viz"><div class="flow"><div>Fri evening: received</div><i>↓</i><div>Weekend: banks closed</div><i>↓</i><div>Mon morning: to broker</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="24">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q25</span><span class="side">Question</span></div>
+<p class="qt">An agent wants to work for GREC and must go inactive. How long can a license stay inactive?</p>
+<ol class="opts"><li><b>a.</b>Three years</li><li><b>b.</b>Five years</li><li><b>c.</b>Forever</li><li><b>d.</b>They must surrender the license</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q25</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Forever</div></div>
+<p>Georgia sets no time limit on inactive status. The licensee still renews and pays fees, and must meet requirements before reactivating.</p>
+<div class="viz"><div class="big">∞</div><div class="cap">no limit on inactive status</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="25">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q26</span><span class="side">Question</span></div>
+<p class="qt">The Recovery Fund pays how much per violation, and how much total per licensee?</p>
+<ol class="opts"><li><b>a.</b>$25,000 and $75,000</li><li><b>b.</b>$25,000 and $50,000</li><li><b>c.</b>$50,000 and $75,000</li><li><b>d.</b>$25,000 and $100,000</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q26</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">$25,000 and $75,000</div></div>
+<p>The fund pays up to $25,000 per transaction and up to $75,000 total against any one licensee.</p>
+<div class="viz"><div class="big">$25k / $75k</div><div class="cap">per violation / per licensee</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="26">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q27</span><span class="side">Question</span></div>
+<p class="qt">Your client says not to present offers below $250,000. A buyer offers $200,000. What should you do?</p>
+<ol class="opts"><li><b>a.</b>Counter before presenting</li><li><b>b.</b>Present the offer to the seller</li><li><b>c.</b>Accept but don't present it</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q27</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Present the offer to the seller</div></div>
+<p>Agents present all offers to their client. You can't counter or accept for the client. Present the offer and let the seller decide.</p>
+<div class="viz"><div class="flow"><div>$200k offer arrives</div><i>↓</i><div>Present it</div><i>↓</i><div>Seller decides</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="27">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q28</span><span class="side">Question</span></div>
+<p class="qt">How much can GREC fine for a violation of license law?</p>
+<ol class="opts"><li><b>a.</b>$2,000 each, up to $10,000</li><li><b>b.</b>$1,000 each, up to $5,000</li><li><b>c.</b>$2,500 each, up to $25,000</li><li><b>d.</b>$2,000 each, up to $5,000</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q28</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">$1,000 each, up to $5,000</div></div>
+<p>GREC can fine up to $1,000 per violation and up to $5,000 for multiple violations in one case.</p>
+<div class="viz"><div class="big">$1k / $5k</div><div class="cap">per violation / max</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="28">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q29</span><span class="side">Question</span></div>
+<p class="qt">A builder offers a $2,000 bonus to the first agent who brings a qualified buyer. Can you accept it?</p>
+<ol class="opts"><li><b>a.</b>Yes, with disclosure to the purchaser</li><li><b>b.</b>No, it's a kickback</li><li><b>c.</b>Yes, with disclosure and permission from your broker</li><li><b>d.</b>Yes, with disclosure to GREC</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q29</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Yes, with disclosure and permission from your broker</div></div>
+<p>You can only be paid through your broker, and the bonus has to be disclosed. With your broker's permission and proper disclosure, it's legal.</p>
+<div class="viz"><div class="flow"><div>Builder pays bonus</div><i>↓</i><div>Through your broker</div><i>↓</i><div>To you, disclosed</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="29">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q30</span><span class="side">Question</span></div>
+<p class="qt">How long can an agent leave a sign up at an expired listing that didn't sell?</p>
+<ol class="opts"><li><b>a.</b>0 days</li><li><b>b.</b>5 days</li><li><b>c.</b>7 days</li><li><b>d.</b>10 days</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q30</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">10 days</div></div>
+<p>Signs must be removed within 10 days after a listing expires or ends, sold or not.</p>
+<div class="viz"><div class="big">10 days</div><div class="cap">sign removal after listing ends</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="30">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q31</span><span class="side">Question</span></div>
+<p class="qt">A neighbor is about to sell. You start lining up buyers to make offers before it's listed. Can you do this?</p>
+<ol class="opts"><li><b>a.</b>Yes, it's common practice</li><li><b>b.</b>No, this is offering an unlisted property</li><li><b>c.</b>Yes, if you don't use public advertising</li><li><b>d.</b>No, this creates a dual agency</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q31</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">No, this is offering an unlisted property</div></div>
+<p>You can't offer or market a property without the owner's written authorization. Lining up buyers for a home that isn't listed with you is offering property without consent.</p>
+<div class="viz"><div class="verdict n">✕ No listing, no offering</div><div class="cap">Owner must authorize first</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="31">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q32</span><span class="side">Question</span></div>
+<p class="qt">Which is an example of an unfair practice?</p>
+<ol class="opts"><li><b>a.</b>Encouraging a buyer to get an inspection</li><li><b>b.</b>Encouraging a buyer to break their contract with another agent, with your broker's permission</li><li><b>c.</b>Showing an open house to a couple who has an agent</li><li><b>d.</b>Encouraging a customer to list with your broker instead of another</li><li><b>e.</b>All the above</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q32</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Encouraging a buyer to break their contract with another agent, with your broker's permission</div></div>
+<p>Inducing someone to break a contract with another brokerage is an unfair practice, and your broker's permission doesn't fix it. The other choices are normal business.</p>
+<div class="viz"><div class="verdict n">✕ Don't break their contract</div><div class="cap">broker OK doesn't help</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="32">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q33</span><span class="side">Question</span></div>
+<p class="qt">Your cousin brings you a listing and wants only a $25 Starbucks gift card in return. Is this legal?</p>
+<ol class="opts"><li><b>a.</b>Yes, nominal value</li><li><b>b.</b>Yes, if the broker is informed</li><li><b>c.</b>Yes, it's a gift card not money</li><li><b>d.</b>No! Unlicensed people can't receive any referral</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q33</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">No! Unlicensed people can't receive any referral</div></div>
+<p>Only licensees can be paid for referrals. Anything of value counts, including a small gift card.</p>
+<div class="viz"><div class="verdict n">✕ Nothing of value</div><div class="cap">to unlicensed referrers</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="33">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q34</span><span class="side">Question</span></div>
+<p class="qt">Your client gives you $1,000 earnest money Monday night. The offer is accepted Wednesday at noon. When do you turn it over?</p>
+<ol class="opts"><li><b>a.</b>Probably Monday night</li><li><b>b.</b>Probably Tuesday morning</li><li><b>c.</b>Probably Wednesday afternoon</li><li><b>d.</b>Probably Thursday morning</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q34</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Probably Tuesday morning</div></div>
+<p>The clock starts when you receive the money, not when the offer is accepted. Received Monday night, it goes to the broker the next business morning: Tuesday.</p>
+<div class="viz"><div class="flow"><div>Mon night: received</div><i>↓</i><div>Tue morning: to broker</div><i>↓</i><div>Wed: offer accepted</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="34">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q35</span><span class="side">Question</span></div>
+<p class="qt">Can your broker put earnest money in an interest-bearing trust account?</p>
+<ol class="opts"><li><b>a.</b>No, violates license law</li><li><b>b.</b>Yes, if the buyer agrees</li><li><b>c.</b>Yes, if all parties agree</li><li><b>d.</b>No, violates rules</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q35</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Yes, if all parties agree</div></div>
+<p>It's allowed only when all parties agree, including who receives the interest. One party alone can't authorize it.</p>
+<div class="viz"><div class="chk n"><span>✕</span>Buyer only</div><div class="chk y"><span>✓</span>All parties agree</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="35">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q36</span><span class="side">Question</span></div>
+<p class="qt">Is giving your seller client a $100 gift card as a closing gift a violation of Georgia law?</p>
+<ol class="opts"><li><b>a.</b>No, with the listing broker's permission</li><li><b>b.</b>No, if the buyer is a licensee</li><li><b>c.</b>No, with GREC's permission</li><li><b>d.</b>No, if the agent pays for it</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q36</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">No, with the listing broker's permission</div></div>
+<p>Anything a licensee gives in connection with a transaction runs through the broker. With your broker's permission, a closing gift to your own client is fine.</p>
+<div class="viz"><div class="verdict y">✓ OK with broker</div><div class="cap">gift to your own client</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="36">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q37</span><span class="side">Question</span></div>
+<p class="qt">Before GREC starts an investigation, the complaint must:</p>
+<ol class="opts"><li><b>a.</b>Have a sworn written statement</li><li><b>b.</b>Have supporting evidence</li><li><b>c.</b>Be filed online</li><li><b>d.</b>Involve a closed sale</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q37</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">Have a sworn written statement</div></div>
+<p>GREC acts on sworn, written complaints. Evidence comes out during the investigation, and the deal doesn't have to have closed.</p>
+<div class="viz"><div class="flow"><div>Sworn written complaint</div><i>↓</i><div>GREC investigates</div><i>↓</i><div>Hearing if warranted</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="37">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q38</span><span class="side">Question</span></div>
+<p class="qt">A person practicing real estate without a license could be found guilty of a:</p>
+<ol class="opts"><li><b>a.</b>Felony</li><li><b>b.</b>License law violation</li><li><b>c.</b>Misdemeanor</li><li><b>d.</b>Federal license law</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q38</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Misdemeanor</div></div>
+<p>Unlicensed real estate activity is a misdemeanor in Georgia, and GREC can also issue fines.</p>
+<div class="viz"><div class="big">Misdemeanor</div><div class="cap">unlicensed practice</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="38">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q39</span><span class="side">Question</span></div>
+<p class="qt">When must an agent notify GREC of an address change?</p>
+<ol class="opts"><li><b>a.</b>Within 10 days</li><li><b>b.</b>Within 24 hours</li><li><b>c.</b>Within 60 days</li><li><b>d.</b>Within 30 days</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q39</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Within 30 days</div></div>
+<p>Licensees must report a change of address (and name) to GREC within 30 days.</p>
+<div class="viz"><div class="big">30 days</div><div class="cap">address change notice</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="39">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q40</span><span class="side">Question</span></div>
+<p class="qt">Fees and fines collected by GREC must be held where?</p>
+<ol class="opts"><li><b>a.</b>Insured trust account</li><li><b>b.</b>Insured business checking</li><li><b>c.</b>The state treasury</li><li><b>d.</b>Insured operating account</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q40</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">The state treasury</div></div>
+<p>GREC is a state agency, so the money it collects goes to the state treasury. Trust accounts are for brokers.</p>
+<div class="viz"><div class="flow"><div>Fees &amp; fines</div><i>↓</i><div>GREC collects</div><i>↓</i><div>State treasury</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="40">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q41</span><span class="side">Question</span></div>
+<p class="qt">A salesperson applicant must complete all the following EXCEPT:</p>
+<ol class="opts"><li><b>a.</b>Take a 75-hour in-seat class</li><li><b>b.</b>Pass a background check</li><li><b>c.</b>Pass the state exam</li><li><b>d.</b>Pass the class final</li><li><b>e.</b>Be 18</li><li><b>f.</b>All apply</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q41</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">Take a 75-hour in-seat class</div></div>
+<p>The 75 hours can be taken online, so "in-seat" makes A the exception. The background check, both exams and age 18 are all required. Same trap as question 6.</p>
+<div class="viz"><div class="chk n"><span>✕</span>In-seat only</div><div class="chk y"><span>✓</span>Background check</div><div class="chk y"><span>✓</span>Course final + state exam</div><div class="chk y"><span>✓</span>Age 18+</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="41">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q42</span><span class="side">Question</span></div>
+<p class="qt">Unless renewed, a license expires on:</p>
+<ol class="opts"><li><b>a.</b>Their birthday</li><li><b>b.</b>The end of the year</li><li><b>c.</b>The end of their birthday month</li><li><b>d.</b>December 31st of the expiration year</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q42</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">The end of their birthday month</div></div>
+<p>Georgia licenses expire on the last day of the licensee's birth month in the renewal year.</p>
+<div class="viz"><div class="big">Birth month</div><div class="cap">last day of it</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="42">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q43</span><span class="side">Question</span></div>
+<p class="qt">To manage a community association, a licensee needs at minimum what license and training?</p>
+<ol class="opts"><li><b>a.</b>Real estate license and 25 hours</li><li><b>b.</b>Real estate license and 75 hours</li><li><b>c.</b>CAM license and 25 hours</li><li><b>d.</b>CAM license and 75 hours</li><li><b>e.</b>Broker's license and 60 hours</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q43</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">CAM license and 25 hours</div></div>
+<p>Community association managers need a CAM license, which takes a 25-hour course. A full broker's license isn't required.</p>
+<div class="viz"><div class="big">CAM · 25 hr</div><div class="cap">community association manager</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="43">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q44</span><span class="side">Question</span></div>
+<p class="qt">A new applicant who just passed the exam has how long to activate their license or retake the exam?</p>
+<ol class="opts"><li><b>a.</b>One year</li><li><b>b.</b>18 months</li><li><b>c.</b>3 months</li><li><b>d.</b>No time limit</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q44</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">a</div><div class="atext">One year</div></div>
+<p>One year to activate the license or retake the exam.</p><div class="flag"><b>Check with instructor</b>GREC's current rules give applicants three months after passing the exam to apply for the license (choice C). Confirm which number your instructor wants.</div>
+<div class="viz"><div class="big">1 yr</div><div class="cap">to activate or retest</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="44">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q45</span><span class="side">Question</span></div>
+<p class="qt">How many CE hours must be license law (and paid for by the broker)?</p>
+<ol class="opts"><li><b>a.</b>6 hours</li><li><b>b.</b>No minimum</li><li><b>c.</b>3 hours</li><li><b>d.</b>9 hours</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q45</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">3 hours</div></div>
+<p>Three of the 36 CE hours in each renewal cycle must cover license law.</p>
+<div class="viz"><div class="eq"><span class="r">3 hr license law</span><em>of</em><span class="">36 hr CE</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="45">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q46</span><span class="side">Question</span></div>
+<p class="qt">Which of the following must be reported to GREC?</p>
+<ol class="opts"><li><b>a.</b>Agent arrested for murder</li><li><b>b.</b>Agent arrested for theft</li><li><b>c.</b>Agent arrested for assault</li><li><b>d.</b>Agent arrested and found innocent of reckless driving</li><li><b>e.</b>All the above</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q46</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Agent arrested and found innocent of reckless driving</div></div>
+<p>D is the expected answer.</p><div class="flag"><b>Check with instructor</b>As written this one is confusing. Georgia requires licensees to report convictions (and certain pleas), not arrests, within 60 days. An acquittal wouldn't need reporting. The question likely meant "which does NOT need to be reported", which makes D the one that stands out.</div>
+<div class="viz"><div class="chk y"><span>✓</span>Conviction: report</div><div class="chk n"><span>✕</span>Arrest alone</div><div class="chk n"><span>✕</span>Found innocent</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="46">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q47</span><span class="side">Question</span></div>
+<p class="qt">Which is considered a blind ad?</p>
+<ol class="opts"><li><b>a.</b>An ad using your broker's name</li><li><b>b.</b>An ad without the property address</li><li><b>c.</b>Selling a house without your license number on the contract</li><li><b>d.</b>A blind agent exempt from advertising rules</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q47</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Selling a house without your license number on the contract</div></div>
+<p>C is the expected answer.</p><div class="flag"><b>Check with instructor</b>In Georgia, a blind ad is one that leaves out the firm's registered name. None of the choices says that directly. If you see a choice about missing the broker's name, that's the textbook answer.</div>
+<div class="viz"><div class="chk n"><span>✕</span>Firm name missing = blind ad</div><div class="chk y"><span>✓</span>Firm name shown = OK</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="47">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q48</span><span class="side">Question</span></div>
+<p class="qt">A salesperson wants to perform brokers' duties for an unlicensed developer. Which is true?</p>
+<ol class="opts"><li><b>a.</b>Can't, developer is unlicensed</li><li><b>b.</b>Must go inactive</li><li><b>c.</b>Needs broker's permission</li><li><b>d.</b>Must surrender their license</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q48</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Must surrender their license</div></div>
+<p>A licensee can't do brokerage work outside their own firm. To work directly for an unlicensed owner under the employee exemption, they must give up the license.</p>
+<div class="viz"><div class="flow"><div>Licensed agent</div><i>↓</i><div>Surrender license</div><i>↓</i><div>Work for developer</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="48">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q49</span><span class="side">Question</span></div>
+<p class="qt">Can earnest money held by the broker pay for inspections and appraisals?</p>
+<ol class="opts"><li><b>a.</b>Never</li><li><b>b.</b>Yes, that's its purpose</li><li><b>c.</b>Yes, with seller's written permission</li><li><b>d.</b>Yes, with written permission from buyer and seller</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q49</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">d</div><div class="atext">Yes, with written permission from buyer and seller</div></div>
+<p>Earnest money belongs to the transaction, not to either party alone. It can only be spent on costs like inspections with written agreement from both buyer and seller.</p>
+<div class="viz"><div class="chk n"><span>✕</span>One side's OK</div><div class="chk y"><span>✓</span>Buyer + seller in writing</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="49">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q50</span><span class="side">Question</span></div>
+<p class="qt">A CAM handling funds over $60,000 must have:</p>
+<ol class="opts"><li><b>a.</b>Homeowner insurance</li><li><b>b.</b>Fidelity bond insurance</li><li><b>c.</b>E&amp;O insurance</li><li><b>d.</b>Hazard insurance</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q50</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Fidelity bond insurance</div></div>
+<p>A fidelity bond protects the association if someone handling its money steals it. CAMs handling large sums must carry one.</p>
+<div class="viz"><div class="big">> $60k</div><div class="cap">requires a fidelity bond</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="50">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q51</span><span class="side">Question</span></div>
+<p class="qt">An agent accused of violating license law has the right to:</p>
+<ol class="opts"><li><b>a.</b>A jury trial</li><li><b>b.</b>A hearing before the Commission</li><li><b>c.</b>A lawyer</li><li><b>d.</b>Arbitration</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q51</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">A hearing before the Commission</div></div>
+<p>License discipline is an administrative matter. The licensee gets notice and a hearing before GREC before sanctions are imposed.</p>
+<div class="viz"><div class="flow"><div>Complaint</div><i>↓</i><div>Notice</div><i>↓</i><div>Hearing before GREC</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="51">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q52</span><span class="side">Question</span></div>
+<p class="qt">How many members does GREC have?</p>
+<ol class="opts"><li><b>a.</b>5</li><li><b>b.</b>5, 4 licensed</li><li><b>c.</b>6, 5 licensed</li><li><b>d.</b>6</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q52</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">6, 5 licensed</div></div>
+<p>Six members: five licensed real estate professionals and one public member who isn't in the business.</p>
+<div class="viz"><div style="display:flex;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:var(--navy);border:2px solid var(--navy)"></span><span style="width:22px;height:22px;border-radius:50%;background:var(--navy);border:2px solid var(--navy)"></span><span style="width:22px;height:22px;border-radius:50%;background:var(--navy);border:2px solid var(--navy)"></span><span style="width:22px;height:22px;border-radius:50%;background:var(--navy);border:2px solid var(--navy)"></span><span style="width:22px;height:22px;border-radius:50%;background:var(--navy);border:2px solid var(--navy)"></span><span style="width:22px;height:22px;border-radius:50%;background:transparent;border:2px solid var(--navy)"></span></div><div class="cap">5 licensees + 1 public member</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="52">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q53</span><span class="side">Question</span></div>
+<p class="qt">What terms do Commission members serve?</p>
+<ol class="opts"><li><b>a.</b>5 years</li><li><b>b.</b>6 years</li><li><b>c.</b>5 years, staggered</li><li><b>d.</b>6 years, staggered</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q53</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">5 years, staggered</div></div>
+<p>Members serve five-year terms that are staggered, so the whole Commission never turns over at once.</p>
+<div class="viz"><div class="big">5 yrs</div><div class="cap">staggered terms</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="53">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q54</span><span class="side">Question</span></div>
+<p class="qt">After closing, the buyer finds the seller took the light fixture. What should they do?</p>
+<ol class="opts"><li><b>a.</b>Contact their agent</li><li><b>b.</b>Contact the seller and state the light was a fixture</li><li><b>c.</b>Sue the seller</li><li><b>d.</b>Call the listing broker</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q54</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Contact the seller and state the light was a fixture</div></div>
+<p>Attached fixtures convey with the house. The first step is to tell the seller the light was a fixture that belongs to the buyer and ask for it back.</p>
+<div class="viz"><div class="flow"><div>Fixture removed</div><i>↓</i><div>Notify seller: it conveys</div><i>↓</i><div>Escalate only if refused</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="54">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q55</span><span class="side">Question</span></div>
+<p class="qt">Does license law apply to an agent whose license is inactive?</p>
+<ol class="opts"><li><b>a.</b>No, they're inactive</li><li><b>b.</b>Yes, it applies to anyone with a license</li><li><b>c.</b>No, only active agents</li><li><b>d.</b>Yes, to everyone with or without a license</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q55</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Yes, it applies to anyone with a license</div></div>
+<p>Holding a license, active or inactive, puts you under license law. GREC can still discipline an inactive licensee.</p>
+<div class="viz"><div class="verdict y">✓ Yes, still applies</div><div class="cap">active or inactive</div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="55">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q56</span><span class="side">Question</span></div>
+<p class="qt">Which statement about the Real Estate Commissioner is not false?</p>
+<ol class="opts"><li><b>a.</b>Must be a licensed agent</li><li><b>b.</b>Is part of the Commission</li><li><b>c.</b>Is not part of the Commission</li><li><b>d.</b>Is appointed by the Governor</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q56</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">c</div><div class="atext">Is not part of the Commission</div></div>
+<p>The Commissioner is hired by the Commission to run daily operations and isn't one of the six members. The Governor appoints the members, not the Commissioner.</p>
+<div class="viz"><div class="map"><b>Governor</b><i>→</i><span>Appoints the 6 members</span><b>Commission</b><i>→</i><span>Hires the Commissioner</span></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="56">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q57</span><span class="side">Question</span></div>
+<p class="qt">Who appoints the Commission?</p>
+<ol class="opts"><li><b>a.</b>Governor with House confirmation</li><li><b>b.</b>Governor with Senate confirmation</li><li><b>c.</b>Governor only</li><li><b>d.</b>Governor with a public vote</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q57</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">Governor with Senate confirmation</div></div>
+<p>The Governor appoints members, and the state Senate confirms them.</p>
+<div class="viz"><div class="flow"><div>Governor appoints</div><i>↓</i><div>Senate confirms</div><i>↓</i><div>Commission member</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article><article class="fc" data-i="57">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q58</span><span class="side">Question</span></div>
+<p class="qt">A buyer offers $375,000 if the seller signs a general warranty deed. The seller counters with a special warranty deed. This counteroffer is best described as:</p>
+<ol class="opts"><li><b>a.</b>A binding contract</li><li><b>b.</b>A qualified or conditional acceptance</li><li><b>c.</b>A terminated agreement between all parties</li><li><b>d.</b>Binding once sent to the buyer</li></ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q58</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">b</div><div class="atext">A qualified or conditional acceptance</div></div>
+<p>Changing a term (the deed type) means the seller hasn't accepted. A qualified or conditional acceptance is a counteroffer, and nothing is binding until the buyer accepts it.</p>
+<div class="viz"><div class="flow"><div>Offer: general warranty deed</div><i>↓</i><div>Seller: special warranty deed</div><i>↓</i><div>Counteroffer; awaits buyer</div></div></div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article></main>
+  <p class="empty glass" id="none" hidden>No cards here yet. Mark cards "Study again" and they'll collect in this pile.</p>
+</div>
+<nav class="dock glass" aria-label="Card controls"><div class="in">
+  <button id="prev">‹ Prev</button><button id="flip" class="flip">Show answer</button><button id="next">Next ›</button>
+</div></nav>
+
+<script>
+const Q=[
+{q:"You're working with a buyer (customer) on your seller client's house. The buyer gives you $2,000 earnest money; the offer expires in 48 hours. Next morning the buyer wants the money back. Can your broker release it?",o:["Yes, if the seller agrees","Yes, if the offer has not been accepted","No, not until the offer has expired","No, you have a binding contract"],a:"B",w:"An offer can be withdrawn any time before it is accepted and the buyer is told of the acceptance. No contract exists yet, so the earnest money is still the buyer's and must be returned. The 48-hour deadline only limits how long the offer lives; it doesn't lock the buyer in.",v:{t:"flow",s:["Offer submitted","Buyer withdraws before acceptance","Earnest money refunded"]}},
+{q:"Before a salesperson can become a broker or associate broker, they must have been actively licensed for how long?",o:["Three out of five years","Two out of five years","Five years","Three years"],a:"D",w:"Three years of active licensure. Remember the number 3.",f:"Georgia's statute says at least three years of active licensure within the five years before applying, which is choice A's wording. If both appear on the state exam, the 3-of-5 wording is the more precise match.",v:{t:"stat",big:"3 yrs",cap:"active license before broker"}},
+{q:"If an affiliated licensee violates the rules or license law, must the broker notify the Commission?",o:["Yes, only if money was involved","No, the broker can provide training","No, only consumers can file complaints","Yes, always"],a:"D",w:"The broker supervises every affiliate and must report a known violation to GREC. Training the agent doesn't replace reporting, and it doesn't matter whether money was involved. This is one of the rare times \"always\" is right.",v:{t:"verdict",y:1,txt:"Always report",cap:"Broker → GREC"}},
+{q:"When advertising a property for sale, what information must be included?",o:["Broker's name, street address and phone number","Name of the listing agent","Price of the property","Broker's name as registered with GREC"],a:"D",w:"Every ad must show the firm's name exactly as registered with the Georgia Real Estate Commission. The agent's name, the price and the office address are optional. An ad without the registered firm name is a blind ad.",v:{t:"list",i:[["y","Firm name as registered with GREC"],["n","Agent's name (optional)"],["n","Price (optional)"]]}},
+{q:"When can a broker NOT deposit earnest money in an insured trust account?",o:["Never","Only with the permission of the buyer","Only with the permission of the seller","Only with permission from all parties"],a:"D",w:"Earnest money goes into the broker's trust account by default. Handling it any other way requires written agreement from all parties to the transaction. Neither the buyer nor the seller can change that alone.",v:{t:"list",i:[["n","Buyer alone"],["n","Seller alone"],["y","All parties agree in writing"]]}},
+{q:"To get a salesperson license, an applicant must do all of the following EXCEPT:",o:["Be 18 years of age","Take a 75-hour classroom real estate course","Have a high school diploma or equivalent","Pass the class and the state exam"],a:"B",w:"The 75-hour prelicense course is required, but it doesn't have to be taken in a classroom; approved online courses count. The word \"classroom\" is what makes B the exception.",v:{t:"list",i:[["y","Age 18+"],["y","High school diploma / GED"],["y","75 hours, any approved format"],["n","Must be in a classroom"]]}},
+{q:"When must earnest money be turned over to the broker?",o:["As soon as practically possible","Immediately, unless the agent has written permission to hold it","When an offer is accepted","Within 72 hours"],a:"A",w:"Georgia doesn't set a fixed number of hours. The agent hands funds to the broker as soon as practically possible, and the broker then deposits them in the trust account.",v:{t:"flow",s:["Agent receives EM","As soon as practical","Broker's trust account"]}},
+{q:"Your client asks that earnest money be held in a separate interest-bearing trust account. Is this legal?",o:["No, it must be in the broker's trust account","Yes, with permission and notification to the Commission","Yes, if all parties agree and the Commission is notified of the account","Yes, since the seller is the client and is entitled to the earnest money"],a:"C",w:"A separate or interest-bearing account is allowed when every party agrees (including who gets the interest) and the broker registers that account with GREC. Permission from one party is not enough.",v:{t:"list",i:[["y","All parties agree in writing"],["y","GREC notified of the account"]]}},
+{q:"Georgia law requires a broker's license for which of the following?",o:["Referring a potential client to another broker without a fee","Listing a property for sale for a fee","Advertising property for another for a fee","Managing a subdivision association for a community you live in"],a:"B",w:"A license is needed when you perform real estate acts for someone else and expect a fee. Listing property for a fee is the core brokerage act. Unpaid referrals and volunteer work for your own community don't need a license.",f:"Advertising property for others for a fee (C) is also a licensed activity under Georgia law. B is the classic textbook example.",v:{t:"eq",p:["For others","+","For a fee","=","License required"]}},
+{q:"An agent may want to stop practicing for a while but return later. What is their best option?",o:["Keep the license active with a broker","Surrender the license","Place the license on inactive status","Let the license lapse"],a:"C",w:"Inactive status keeps the license alive without being affiliated with a broker. You can reactivate later by meeting the requirements. Lapsing means reinstatement fees, and surrendering means starting over.",v:{t:"list",i:[["y","Inactive: easy return"],["n","Lapse: fees and deadlines"],["n","Surrender: start over"]]}},
+{q:"A corporation's qualifying broker must be an officer. What must the qualifying broker of an LLC be?",o:["An officer","A shareholder","A member","An investor"],a:"C",w:"The qualifying broker must hold a controlling role in the firm. Owners of an LLC are called members, so the qualifying broker must be a member.",v:{t:"map",i:[["Corporation","Officer"],["Partnership","Partner"],["LLC","Member"]]}},
+{q:"If the Commission finds a broker's trust account unsafe, what will it do?",o:["Close the account","Report it to the Attorney General","Appoint a receiver","Close the brokerage"],a:"B",w:"GREC doesn't seize the account itself. It refers the matter to the Attorney General, who can ask a court to appoint a receiver to protect the money.",v:{t:"flow",s:["GREC finds account unsafe","Attorney General","Court appoints receiver"]}},
+{q:"In Georgia, an associate broker can do which of the following?",o:["List property in their own name if registered","Advertise property in their own name","Review contracts if authorized by the qualifying broker","Hire a salesperson of his/her choosing"],a:"C",w:"An associate broker still works under the qualifying broker. Listings and ads belong to the firm, and hiring is the qualifying broker's call. Reviewing contracts is a supervisory task the qualifying broker can delegate.",v:{t:"flow",s:["Qualifying broker","Delegates duty","Associate broker reviews contracts"]}},
+{q:"Can a licensee work under a brokerage other than the one holding their license?",o:["No, this violates license law","Yes, with permission from both brokers","Yes, with permission of their qualifying broker","Yes, with permission from GREC"],a:"C",w:"Your license is held by one firm, and that firm's qualifying broker is responsible for you. Acting through another brokerage requires your own qualifying broker's consent.",v:{t:"verdict",y:1,txt:"Your broker's OK",cap:"Your broker stays responsible"}},
+{q:"If an agent lets their license lapse, how can they reinstate it?",o:["Go through the application process again","Within 2 years, by paying renewal fees, reinstatement fee and late charges","Within 10 years, by paying all fees","Once lapsed, you can never get it back"],a:"B",w:"A lapsed license can be reinstated within two years by paying the renewal fees, the reinstatement fee and late charges (plus any missing education). After two years, you have to requalify.",v:{t:"tl",seg:[[2,"ok","0–2 yrs: pay & reinstate"],[2,"bad","2+ yrs: requalify"]]}},
+{q:"A new licensee must complete __ hours of training, which equals __ hours of continuing education.",o:["20 and 9","25 and 9","36 and 9","25 and 6"],a:"B",w:"New licensees take a 25-hour post-license course during their first renewal period. Those 25 hours count as 9 hours toward continuing education.",v:{t:"eq",p:["25 hr post-license","=","9 hr CE credit"],r:2}},
+{q:"To renew, a licensee (unless grandfathered) must complete ___ hours of CE every ___ years.",o:["24 and 4","24 and 2","36 and 3","36 and 4"],a:"D",w:"Georgia requires 36 hours of continuing education for each 4-year renewal period. Three of those hours must be license law.",v:{t:"stat",big:"36 / 4",cap:"CE hours per 4-year cycle"}},
+{q:"A listing where the broker's commission is the difference between the selling price and the seller's requested net is what kind of listing?",o:["Open listing","Exclusive listing","Net listing","Blind listing"],a:"C",w:"In a net listing, the seller names the amount they want, and the broker keeps everything above it. It creates a conflict of interest, which is why net listings are discouraged and treated as improper in Georgia.",v:{t:"eq",p:["$300k sale","−","$280k net","=","$20k to broker"],r:4}},
+{q:"The Georgia Real Estate Commission has the authority to:",o:["Revoke an already issued license","Refuse to issue a license","Set fees for licensees","All the above"],a:"D",w:"GREC administers license law. It can refuse, suspend or revoke licenses and sets the fees licensees pay.",v:{t:"list",i:[["y","Revoke licenses"],["y","Refuse licenses"],["y","Set fees"]]}},
+{q:"Your buyer offers $490,000 and asks for the stove and smart fridge. The seller agrees to the price and stove, crosses out the fridge and initials it. What do you have?",o:["Binding agreement","Terminated offer","Accepted offer","Counteroffer","Both B and D","Both A and C","Voided contract","None of the above"],a:"E",w:"Any change to an offer, even a small one, is a rejection plus a new offer. Striking the fridge made the seller's response a counteroffer, and that terminated the buyer's original offer. So both B and D are true.",v:{t:"flow",s:["Offer: price + stove + fridge","Seller strikes fridge","Counteroffer; original offer dead"]}},
+{q:"Broker Smith had associate broker Brown manage the trust account. GREC suspended Brown's license. What should Smith do?",o:["Nothing","Suspend Brown","Terminate Brown","Remove Brown from the trust account but let him buy & sell"],a:"C",w:"A suspended licensee can't do any licensed work, so the broker must end the affiliation and return the license to GREC. Option D fails because Brown can't list or sell for the firm while suspended either.",v:{t:"verdict",y:0,txt:"No licensed work",cap:"while suspended"}},
+{q:"The Research, Education and Recovery Fund must hold at least $1,000,000. If it drops below that, what does GREC do?",o:["Charge all agents a fee immediately","Charge a fee at license renewal until restored","Charge a fee on every transaction","Add a fee on property tax"],a:"B",w:"GREC tops up the fund by adding a fee when licenses are renewed. It continues until the balance is back to the $1,000,000 minimum.",v:{t:"stat",big:"$1M",cap:"minimum; refilled at renewal"}},
+{q:"Your listing sold. How long can advertising stay up after a contract is terminated or closed?",o:["Internet ad and sign removed within 10 days","Both removed within 30 days","Sign within 10 days; no limit online","Sign within 10 days; internet within 30 days"],a:"D",w:"The yard sign must come down within 10 days, and internet advertising must come down within 30 days. Keep the two numbers separate.",v:{t:"tl",seg:[[10,"ok","Day 10: sign"],[20,"warn","Day 30: online ads"]]}},
+{q:"A salesperson receives earnest money on Friday evening. When should it be turned over?",o:["Friday evening","Saturday morning","Monday morning"],a:"C",w:"\"As soon as practically possible\" means the next banking day, when the broker can actually deposit it. From Friday evening, that's Monday morning.",v:{t:"flow",s:["Fri evening: received","Weekend: banks closed","Mon morning: to broker"]}},
+{q:"An agent wants to work for GREC and must go inactive. How long can a license stay inactive?",o:["Three years","Five years","Forever","They must surrender the license"],a:"C",w:"Georgia sets no time limit on inactive status. The licensee still renews and pays fees, and must meet requirements before reactivating.",v:{t:"stat",big:"∞",cap:"no limit on inactive status"}},
+{q:"The Recovery Fund pays how much per violation, and how much total per licensee?",o:["$25,000 and $75,000","$25,000 and $50,000","$50,000 and $75,000","$25,000 and $100,000"],a:"A",w:"The fund pays up to $25,000 per transaction and up to $75,000 total against any one licensee.",v:{t:"stat",big:"$25k / $75k",cap:"per violation / per licensee"}},
+{q:"Your client says not to present offers below $250,000. A buyer offers $200,000. What should you do?",o:["Counter before presenting","Present the offer to the seller","Accept but don't present it"],a:"B",w:"Agents present all offers to their client. You can't counter or accept for the client. Present the offer and let the seller decide.",v:{t:"flow",s:["$200k offer arrives","Present it","Seller decides"]}},
+{q:"How much can GREC fine for a violation of license law?",o:["$2,000 each, up to $10,000","$1,000 each, up to $5,000","$2,500 each, up to $25,000","$2,000 each, up to $5,000"],a:"B",w:"GREC can fine up to $1,000 per violation and up to $5,000 for multiple violations in one case.",v:{t:"stat",big:"$1k / $5k",cap:"per violation / max"}},
+{q:"A builder offers a $2,000 bonus to the first agent who brings a qualified buyer. Can you accept it?",o:["Yes, with disclosure to the purchaser","No, it's a kickback","Yes, with disclosure and permission from your broker","Yes, with disclosure to GREC"],a:"C",w:"You can only be paid through your broker, and the bonus has to be disclosed. With your broker's permission and proper disclosure, it's legal.",v:{t:"flow",s:["Builder pays bonus","Through your broker","To you, disclosed"]}},
+{q:"How long can an agent leave a sign up at an expired listing that didn't sell?",o:["0 days","5 days","7 days","10 days"],a:"D",w:"Signs must be removed within 10 days after a listing expires or ends, sold or not.",v:{t:"stat",big:"10 days",cap:"sign removal after listing ends"}},
+{q:"A neighbor is about to sell. You start lining up buyers to make offers before it's listed. Can you do this?",o:["Yes, it's common practice","No, this is offering an unlisted property","Yes, if you don't use public advertising","No, this creates a dual agency"],a:"B",w:"You can't offer or market a property without the owner's written authorization. Lining up buyers for a home that isn't listed with you is offering property without consent.",v:{t:"verdict",y:0,txt:"No listing, no offering",cap:"Owner must authorize first"}},
+{q:"Which is an example of an unfair practice?",o:["Encouraging a buyer to get an inspection","Encouraging a buyer to break their contract with another agent, with your broker's permission","Showing an open house to a couple who has an agent","Encouraging a customer to list with your broker instead of another","All the above"],a:"B",w:"Inducing someone to break a contract with another brokerage is an unfair practice, and your broker's permission doesn't fix it. The other choices are normal business.",v:{t:"verdict",y:0,txt:"Don't break their contract",cap:"broker OK doesn't help"}},
+{q:"Your cousin brings you a listing and wants only a $25 Starbucks gift card in return. Is this legal?",o:["Yes, nominal value","Yes, if the broker is informed","Yes, it's a gift card not money","No! Unlicensed people can't receive any referral"],a:"D",w:"Only licensees can be paid for referrals. Anything of value counts, including a small gift card.",v:{t:"verdict",y:0,txt:"Nothing of value",cap:"to unlicensed referrers"}},
+{q:"Your client gives you $1,000 earnest money Monday night. The offer is accepted Wednesday at noon. When do you turn it over?",o:["Probably Monday night","Probably Tuesday morning","Probably Wednesday afternoon","Probably Thursday morning"],a:"B",w:"The clock starts when you receive the money, not when the offer is accepted. Received Monday night, it goes to the broker the next business morning: Tuesday.",v:{t:"flow",s:["Mon night: received","Tue morning: to broker","Wed: offer accepted"]}},
+{q:"Can your broker put earnest money in an interest-bearing trust account?",o:["No, violates license law","Yes, if the buyer agrees","Yes, if all parties agree","No, violates rules"],a:"C",w:"It's allowed only when all parties agree, including who receives the interest. One party alone can't authorize it.",v:{t:"list",i:[["n","Buyer only"],["y","All parties agree"]]}},
+{q:"Is giving your seller client a $100 gift card as a closing gift a violation of Georgia law?",o:["No, with the listing broker's permission","No, if the buyer is a licensee","No, with GREC's permission","No, if the agent pays for it"],a:"A",w:"Anything a licensee gives in connection with a transaction runs through the broker. With your broker's permission, a closing gift to your own client is fine.",v:{t:"verdict",y:1,txt:"OK with broker",cap:"gift to your own client"}},
+{q:"Before GREC starts an investigation, the complaint must:",o:["Have a sworn written statement","Have supporting evidence","Be filed online","Involve a closed sale"],a:"A",w:"GREC acts on sworn, written complaints. Evidence comes out during the investigation, and the deal doesn't have to have closed.",v:{t:"flow",s:["Sworn written complaint","GREC investigates","Hearing if warranted"]}},
+{q:"A person practicing real estate without a license could be found guilty of a:",o:["Felony","License law violation","Misdemeanor","Federal license law"],a:"C",w:"Unlicensed real estate activity is a misdemeanor in Georgia, and GREC can also issue fines.",v:{t:"stat",big:"Misdemeanor",cap:"unlicensed practice"}},
+{q:"When must an agent notify GREC of an address change?",o:["Within 10 days","Within 24 hours","Within 60 days","Within 30 days"],a:"D",w:"Licensees must report a change of address (and name) to GREC within 30 days.",v:{t:"stat",big:"30 days",cap:"address change notice"}},
+{q:"Fees and fines collected by GREC must be held where?",o:["Insured trust account","Insured business checking","The state treasury","Insured operating account"],a:"C",w:"GREC is a state agency, so the money it collects goes to the state treasury. Trust accounts are for brokers.",v:{t:"flow",s:["Fees & fines","GREC collects","State treasury"]}},
+{q:"A salesperson applicant must complete all the following EXCEPT:",o:["Take a 75-hour in-seat class","Pass a background check","Pass the state exam","Pass the class final","Be 18","All apply"],a:"A",w:"The 75 hours can be taken online, so \"in-seat\" makes A the exception. The background check, both exams and age 18 are all required. Same trap as question 6.",v:{t:"list",i:[["n","In-seat only"],["y","Background check"],["y","Course final + state exam"],["y","Age 18+"]]}},
+{q:"Unless renewed, a license expires on:",o:["Their birthday","The end of the year","The end of their birthday month","December 31st of the expiration year"],a:"C",w:"Georgia licenses expire on the last day of the licensee's birth month in the renewal year.",v:{t:"stat",big:"Birth month",cap:"last day of it"}},
+{q:"To manage a community association, a licensee needs at minimum what license and training?",o:["Real estate license and 25 hours","Real estate license and 75 hours","CAM license and 25 hours","CAM license and 75 hours","Broker's license and 60 hours"],a:"C",w:"Community association managers need a CAM license, which takes a 25-hour course. A full broker's license isn't required.",v:{t:"stat",big:"CAM · 25 hr",cap:"community association manager"}},
+{q:"A new applicant who just passed the exam has how long to activate their license or retake the exam?",o:["One year","18 months","3 months","No time limit"],a:"A",w:"One year to activate the license or retake the exam.",f:"GREC's current rules give applicants three months after passing the exam to apply for the license (choice C). Confirm which number your instructor wants.",v:{t:"stat",big:"1 yr",cap:"to activate or retest"}},
+{q:"How many CE hours must be license law (and paid for by the broker)?",o:["6 hours","No minimum","3 hours","9 hours"],a:"C",w:"Three of the 36 CE hours in each renewal cycle must cover license law.",v:{t:"eq",p:["3 hr license law","of","36 hr CE"],r:0}},
+{q:"Which of the following must be reported to GREC?",o:["Agent arrested for murder","Agent arrested for theft","Agent arrested for assault","Agent arrested and found innocent of reckless driving","All the above"],a:"D",w:"D is the expected answer.",f:"As written this one is confusing. Georgia requires licensees to report convictions (and certain pleas), not arrests, within 60 days. An acquittal wouldn't need reporting. The question likely meant \"which does NOT need to be reported\", which makes D the one that stands out.",v:{t:"list",i:[["y","Conviction: report"],["n","Arrest alone"],["n","Found innocent"]]}},
+{q:"Which is considered a blind ad?",o:["An ad using your broker's name","An ad without the property address","Selling a house without your license number on the contract","A blind agent exempt from advertising rules"],a:"C",w:"C is the expected answer.",f:"In Georgia, a blind ad is one that leaves out the firm's registered name. None of the choices says that directly. If you see a choice about missing the broker's name, that's the textbook answer.",v:{t:"list",i:[["n","Firm name missing = blind ad"],["y","Firm name shown = OK"]]}},
+{q:"A salesperson wants to perform brokers' duties for an unlicensed developer. Which is true?",o:["Can't, developer is unlicensed","Must go inactive","Needs broker's permission","Must surrender their license"],a:"D",w:"A licensee can't do brokerage work outside their own firm. To work directly for an unlicensed owner under the employee exemption, they must give up the license.",v:{t:"flow",s:["Licensed agent","Surrender license","Work for developer"]}},
+{q:"Can earnest money held by the broker pay for inspections and appraisals?",o:["Never","Yes, that's its purpose","Yes, with seller's written permission","Yes, with written permission from buyer and seller"],a:"D",w:"Earnest money belongs to the transaction, not to either party alone. It can only be spent on costs like inspections with written agreement from both buyer and seller.",v:{t:"list",i:[["n","One side's OK"],["y","Buyer + seller in writing"]]}},
+{q:"A CAM handling funds over $60,000 must have:",o:["Homeowner insurance","Fidelity bond insurance","E&O insurance","Hazard insurance"],a:"B",w:"A fidelity bond protects the association if someone handling its money steals it. CAMs handling large sums must carry one.",v:{t:"stat",big:"> $60k",cap:"requires a fidelity bond"}},
+{q:"An agent accused of violating license law has the right to:",o:["A jury trial","A hearing before the Commission","A lawyer","Arbitration"],a:"B",w:"License discipline is an administrative matter. The licensee gets notice and a hearing before GREC before sanctions are imposed.",v:{t:"flow",s:["Complaint","Notice","Hearing before GREC"]}},
+{q:"How many members does GREC have?",o:["5","5, 4 licensed","6, 5 licensed","6"],a:"C",w:"Six members: five licensed real estate professionals and one public member who isn't in the business.",v:{t:"seats"}},
+{q:"What terms do Commission members serve?",o:["5 years","6 years","5 years, staggered","6 years, staggered"],a:"C",w:"Members serve five-year terms that are staggered, so the whole Commission never turns over at once.",v:{t:"stat",big:"5 yrs",cap:"staggered terms"}},
+{q:"After closing, the buyer finds the seller took the light fixture. What should they do?",o:["Contact their agent","Contact the seller and state the light was a fixture","Sue the seller","Call the listing broker"],a:"B",w:"Attached fixtures convey with the house. The first step is to tell the seller the light was a fixture that belongs to the buyer and ask for it back.",v:{t:"flow",s:["Fixture removed","Notify seller: it conveys","Escalate only if refused"]}},
+{q:"Does license law apply to an agent whose license is inactive?",o:["No, they're inactive","Yes, it applies to anyone with a license","No, only active agents","Yes, to everyone with or without a license"],a:"B",w:"Holding a license, active or inactive, puts you under license law. GREC can still discipline an inactive licensee.",v:{t:"verdict",y:1,txt:"Yes, still applies",cap:"active or inactive"}},
+{q:"Which statement about the Real Estate Commissioner is not false?",o:["Must be a licensed agent","Is part of the Commission","Is not part of the Commission","Is appointed by the Governor"],a:"C",w:"The Commissioner is hired by the Commission to run daily operations and isn't one of the six members. The Governor appoints the members, not the Commissioner.",v:{t:"map",i:[["Governor","Appoints the 6 members"],["Commission","Hires the Commissioner"]]}},
+{q:"Who appoints the Commission?",o:["Governor with House confirmation","Governor with Senate confirmation","Governor only","Governor with a public vote"],a:"B",w:"The Governor appoints members, and the state Senate confirms them.",v:{t:"flow",s:["Governor appoints","Senate confirms","Commission member"]}},
+{q:"A buyer offers $375,000 if the seller signs a general warranty deed. The seller counters with a special warranty deed. This counteroffer is best described as:",o:["A binding contract","A qualified or conditional acceptance","A terminated agreement between all parties","Binding once sent to the buyer"],a:"B",w:"Changing a term (the deed type) means the seller hasn't accepted. A qualified or conditional acceptance is a counteroffer, and nothing is binding until the buyer accepts it.",v:{t:"flow",s:["Offer: general warranty deed","Seller: special warranty deed","Counteroffer; awaits buyer"]}}
+];
+const L="ABCDEFGH";
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function viz(v){
+  if(v.t==="stat")return `<div class="big">${esc(v.big)}</div><div class="cap">${esc(v.cap)}</div>`;
+  if(v.t==="verdict")return `<div class="verdict ${v.y?"y":"n"}">${v.y?"✓":"✕"} ${esc(v.txt)}</div><div class="cap">${esc(v.cap)}</div>`;
+  if(v.t==="flow")return `<div class="flow">${v.s.map(esc).map(s=>`<div>${s}</div>`).join("<i>↓</i>")}</div>`;
+  if(v.t==="list")return v.i.map(([m,t])=>`<div class="chk ${m}"><span>${m==="y"?"✓":"✕"}</span>${esc(t)}</div>`).join("");
+  if(v.t==="map")return `<div class="map">${v.i.map(([a,b])=>`<b>${esc(a)}</b><i>→</i><span>${esc(b)}</span>`).join("")}</div>`;
+  if(v.t==="eq"){const r=v.r??v.p.length-1;return `<div class="eq">${v.p.map((x,i)=>/^[+−=]$|^of$/.test(x)?`<em>${x}</em>`:`<span class="${i===r?"r":""}">${esc(x)}</span>`).join("")}</div>`}
+  if(v.t==="tl"){const tot=v.seg.reduce((a,s)=>a+s[0],0);const col={ok:"var(--ok)",bad:"var(--bad)",warn:"var(--warn)"};
+    return `<div class="tl"><div class="bar">${v.seg.map(s=>`<i style="width:${s[0]/tot*100}%;background:${col[s[1]]}"></i>`).join("")}</div>${v.seg.map(s=>`<div class="row"><span style="color:${col[s[1]]}">■</span><span>${esc(s[2])}</span></div>`).join("")}</div>`}
+  if(v.t==="seats")return `<div style="display:flex;gap:6px">${[1,1,1,1,1,0].map(x=>`<span style="width:22px;height:22px;border-radius:50%;background:${x?"var(--navy)":"transparent"};border:2px solid var(--navy)"></span>`).join("")}</div><div class="cap">5 licensees + 1 public member</div>`;
+  return "";
+}
+function cardHTML(x,i){const n=String(i+1).padStart(2,"0");const ai=L.indexOf(x.a);
+ return `<article class="fc" data-i="${i}">
+<section class="face front glass" tabindex="0"><div class="top"><span>Q${n}</span><span class="side">Question</span></div>
+<p class="qt">${esc(x.q)}</p>
+<ol class="opts">${x.o.map((o,j)=>`<li><b>${L[j].toLowerCase()}.</b>${esc(o)}</li>`).join("")}</ol>
+<div class="hint">Tap the card to flip · swipe for next</div></section>
+<section class="face back glass" tabindex="0"><div class="top"><span>Q${n}</span><span class="side">Answer</span></div>
+<div class="ansrow"><div class="letter">${x.a.toLowerCase()}</div><div class="atext">${esc(x.o[ai])}</div></div>
+<p>${esc(x.w)}</p>${x.f?`<div class="flag"><b>Check with instructor</b>${esc(x.f)}</div>`:""}
+<div class="viz">${viz(x.v)}</div>
+<div class="mark"><button class="again" data-m="again" aria-pressed="false">Study again</button><button class="got" data-m="got" aria-pressed="false">Got it</button></div></section>
+</article>`}
+/*PRERENDER_END*/
+document.documentElement.classList.add("js");
+const deck=document.getElementById("deck");
+if(!deck.children.length)deck.innerHTML=Q.map(cardHTML).join("");
+const cards=[...deck.querySelectorAll(".fc")];
+let marks={};try{marks=JSON.parse(localStorage.getItem("fs-marks")||"{}")}catch(e){}
+const save=()=>{try{localStorage.setItem("fs-marks",JSON.stringify(marks))}catch(e){}};
+let filter="all",shuffled=false,order=[],pos=0;
+function build(){let ids=Q.map((_,i)=>i).filter(i=>filter==="all"||(filter==="flag"&&Q[i].f)||(filter==="again"&&marks[i]==="again"));
+  if(shuffled){for(let i=ids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ids[i],ids[j]]=[ids[j],ids[i]]}}
+  order=ids;pos=Math.min(pos,Math.max(0,order.length-1));show(false)}
+function show(anim=true){cards.forEach(c=>{c.hidden=true;c.classList.remove("flipped")});
+  const none=!order.length;document.getElementById("none").hidden=!none;
+  ["prev","next","flip"].forEach(id=>document.getElementById(id).disabled=none);
+  if(!none){const c=cards[order[pos]];c.hidden=false;c.style.transform="";c.classList.remove("in-r","in-l");if(anim){void c.offsetWidth;c.classList.add(anim==="l"?"in-l":"in-r")}
+    document.getElementById("prev").disabled=pos===0;document.getElementById("next").disabled=pos===order.length-1}
+  document.getElementById("flip").textContent="Show answer";
+  document.getElementById("pos").textContent=none?"No cards":`Card ${pos+1} of ${order.length}`;
+  document.getElementById("fill").style.width=none?"0":((pos+1)/order.length*100)+"%";
+  const v=Object.values(marks);document.getElementById("tally").textContent=`${v.filter(m=>m==="got").length} got it · ${v.filter(m=>m==="again").length} again`;
+  cards.forEach((c,i)=>c.querySelectorAll(".mark button").forEach(b=>b.setAttribute("aria-pressed",marks[i]===b.dataset.m)))}
+let busy=false;
+function flip(){if(!order.length||busy)return;busy=true;const c=cards[order[pos]];c.classList.remove("turn-in");c.classList.add("turn-out");
+  setTimeout(()=>{c.classList.remove("turn-out");c.classList.toggle("flipped");void c.offsetWidth;c.classList.add("turn-in");
+    document.getElementById("flip").textContent=c.classList.contains("flipped")?"Show question":"Show answer";setTimeout(()=>{c.classList.remove("turn-in");busy=false},330)},200)}
+function go(d){const n=pos+d;if(n<0||n>=order.length)return;pos=n;show(d>0?"r":"l")}
+document.getElementById("prev").onclick=()=>go(-1);document.getElementById("next").onclick=()=>go(1);document.getElementById("flip").onclick=flip;
+deck.addEventListener("click",e=>{const b=e.target.closest(".mark button");if(b){e.stopPropagation();const i=+b.closest(".fc").dataset.i;
+  marks[i]=marks[i]===b.dataset.m?undefined:b.dataset.m;if(!marks[i])delete marks[i];save();
+  if(filter==="again"){const keep=pos;build();pos=keep}else{show(false);cards[order[pos]].classList.add("flipped");document.getElementById("flip").textContent="Show question"}
+  const fc=b.closest(".fc");if(marks[i]){fc.classList.add("burst-"+b.dataset.m);setTimeout(()=>fc.classList.remove("burst-got","burst-again"),600)}
+  if(b.dataset.m==="got"&&marks[i]&&filter!=="again")setTimeout(()=>go(1),450);return}
+  if(e.target.closest(".face"))flip()});
+deck.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("face")){e.preventDefault();flip()}});
+document.addEventListener("keydown",e=>{if(e.target.tagName==="BUTTON")return;if(e.key==="ArrowRight")go(1);if(e.key==="ArrowLeft")go(-1)});
+let sx=0,sy=0,dx=0,horiz=null,cur=null;
+deck.addEventListener("touchstart",e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=0;horiz=null;cur=order.length?cards[order[pos]]:null;if(cur)cur.classList.remove("snap","in-r","in-l")},{passive:true});
+deck.addEventListener("touchmove",e=>{if(!cur)return;const x=e.touches[0].clientX-sx,y=e.touches[0].clientY-sy;
+  if(horiz===null&&(Math.abs(x)>8||Math.abs(y)>8))horiz=Math.abs(x)>Math.abs(y);
+  if(horiz){dx=x;cur.classList.add("dragging");cur.style.transform=`translateX(${dx}px) rotate(${dx/22}deg)`}},{passive:true});
+deck.addEventListener("touchend",()=>{if(!cur||!horiz)return;cur.classList.remove("dragging");const d=dx<0?1:-1,n=pos+d;
+  if(Math.abs(dx)>70&&n>=0&&n<order.length){const c=cur;c.classList.add("snap");c.style.transform=`translateX(${dx<0?-120:120}vw) rotate(${dx<0?-18:18}deg)`;setTimeout(()=>{c.classList.remove("snap");c.style.transform="";go(d)},230)}
+  else{cur.classList.add("snap");cur.style.transform=""}},{passive:true});
+deck.addEventListener("click",e=>{if(horiz&&Math.abs(dx)>8){e.stopImmediatePropagation();horiz=null}},true);
+const fb={all:"f-all",again:"f-again",flag:"f-flag"};
+Object.entries(fb).forEach(([k,id])=>document.getElementById(id).onclick=()=>{filter=k;pos=0;Object.entries(fb).forEach(([k2,id2])=>document.getElementById(id2).setAttribute("aria-pressed",k===k2));build()});
+document.getElementById("shuffle").onclick=e=>{shuffled=!shuffled;e.currentTarget.setAttribute("aria-pressed",shuffled);pos=0;build()};
+build();
+</script>
+
+</body>
+</html>
